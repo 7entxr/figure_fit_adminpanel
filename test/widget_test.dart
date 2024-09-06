@@ -1,30 +1,21 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:figure_fit_adminpanel/main.dart';
+import 'package:figure_fit_adminpanel/login_page.dart'; // Import your LoginPage
+import 'package:figure_fit_adminpanel/dashboard.dart';  // Import your DashboardScreen
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('LoginPage shows Admin text and navigates to Dashboard', (WidgetTester tester) async {
+    // Build LoginPage and trigger a frame.
+    await tester.pumpWidget(const MaterialApp(home: LoginPage()));
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Verify that the "Admin." text is found when the drawer is expanded.
+    expect(find.text('Admin.'), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    // Find the 'Dashboard' text in the navigation list and tap on it
+    await tester.tap(find.text('Dashboard'));
+    await tester.pump(); // Rebuild the widget after the state has changed
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Verify that the DashboardScreen is shown after the tap
+    expect(find.byType(DashboardScreen), findsOneWidget);
   });
 }
