@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "996608668596",
+    "firebase_url": "https://figure-fit-official-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "figure-fit-official",
+    "storage_bucket": "figure-fit-official.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:996608668596:android:9aa06b7219f748c0f4f8e1",
+        "android_client_info": {
+          "package_name": "com.fashion.figure_fit_adminpanel"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC-CxLx9T8B_1xwg7vQiaIjHy_I8DvBD20"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:996608668596:android:41abc1b9d047b3f0f4f8e1",
+        "android_client_info": {
+          "package_name": "com.fashion.figure_fit_official"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC-CxLx9T8B_1xwg7vQiaIjHy_I8DvBD20"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
