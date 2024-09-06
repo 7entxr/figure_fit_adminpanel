@@ -1,21 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:figure_fit_adminpanel/login_page.dart'; // Update to the correct path
 import 'package:flutter_test/flutter_test.dart';
-import 'package:figure_fit_adminpanel/main.dart'; // Import the correct package path
-import 'package:figure_fit_adminpanel/dashboard.dart';
 import 'package:figure_fit_adminpanel/manage_orders_screen.dart';
 import 'package:figure_fit_adminpanel/products_screen.dart';
 import 'package:figure_fit_adminpanel/user_profile_screen.dart';
-import 'package:figure_fit_adminpanel/wishlist_product.dart';
-import 'package:figure_fit_adminpanel/cart_products.dart';
-import 'package:figure_fit_adminpanel/ratings.dart';
-import 'package:figure_fit_adminpanel/discounts_and_banners.dart';
-import 'package:figure_fit_adminpanel/gift_box.dart';
-import 'package:figure_fit_adminpanel/settings.dart';
 
 void main() {
   testWidgets('Navigation and drawer functionality test', (WidgetTester tester) async {
     // Build the LoginPage widget and trigger a frame.
-    await tester.pumpWidget(const MaterialApp(home: LoginPage()));
+    await tester.pumpWidget(MaterialApp(home: LoginPage()));
 
     // Verify initial state: should display Dashboard content.
     expect(find.text('Dashboard'), findsOneWidget);
