@@ -1,6 +1,5 @@
 import 'package:figure_fit_adminpanel/login_page.dart';
 import 'package:flutter/material.dart';
-import 'package:figure_fit_adminpanel/dashboard.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 void main() async {
