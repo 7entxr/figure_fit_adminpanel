@@ -62,21 +62,24 @@ class _SideNavigationExampleState extends State<LoginPage> {
                   ),
                 ),
                 Expanded(
-                  child: Column(
-                    children: [
-                      _buildNavItem('Dashboard', Icons.dashboard),
-                      _buildNavItem('Manage Orders', Icons.list),
-                      _buildNavItem('Products', Icons.shopping_bag),
-                      _buildNavItem('User Profile', Icons.person),
-                      _buildNavItem('Wishlist Product', Icons.favorite),
-                      _buildNavItem('Cart Products', Icons.shopping_cart),
-                      _buildNavItem('Ratings', Icons.star),
-                      _buildNavItem('Discounts & Banners', Icons.local_offer),
-                      _buildNavItem('Gift Box', Icons.wallet_giftcard),
-                      _buildNavItem('Settings', Icons.settings),
-                    ],
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        _buildNavItem('Dashboard', Icons.dashboard),
+                        _buildNavItem('Manage Orders', Icons.list),
+                        _buildNavItem('Products', Icons.shopping_bag),
+                        _buildNavItem('User Profile', Icons.person),
+                        _buildNavItem('Wishlist Product', Icons.favorite),
+                        _buildNavItem('Cart Products', Icons.shopping_cart),
+                        _buildNavItem('Ratings', Icons.star),
+                        _buildNavItem('Discounts & Banners', Icons.local_offer),
+                        _buildNavItem('Gift Box', Icons.wallet_giftcard),
+                        _buildNavItem('Settings', Icons.settings),
+                      ],
+                    ),
                   ),
                 ),
+
               ],
             ),
           ),
