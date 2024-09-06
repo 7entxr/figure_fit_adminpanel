@@ -162,13 +162,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       final String username = userData['User Name'] ?? 'Unknown';
                       final String firstLetter = username.isNotEmpty ? username[0].toUpperCase() : '';
                       final String phoneNumber = userData['Phone Number'] ?? 'N/A';
-                      final String phoneNumber1 = userData.containsKey('Phone Number 1') ? userData['Phone Number 1'] : 'N/A';
-                      final String phoneNumber2 = userData.containsKey('Phone Number 2') ? userData['Phone Number 2'] : 'N/A';
-                      final String phoneNumber3 = userData.containsKey('Phone Number 3') ? userData['Phone Number 3'] : 'N/A';
                       final String emailAddress = userData['Email Address'] ?? 'N/A';
-                      final String emailAddress1 = userData.containsKey('Email Address 1') ? userData['Email Address 1'] : 'N/A';
-                      final String emailAddress2 = userData.containsKey('Email Address 2') ? userData['Email Address 2'] : 'N/A';
-                      final String emailAddress3 = userData.containsKey('Email Address 3') ? userData['Email Address 3'] : 'N/A';
                       final Timestamp? timestamp = userData['Timing of giving order'] as Timestamp?;
                       final String formattedDate = timestamp != null
                           ? DateFormat('yyyy-MM-dd').format(timestamp.toDate())
