@@ -158,32 +158,31 @@ class _SideNavigationExampleState extends State<LoginPage> {
     Navigator.pushNamed(context, routeName);
   }
 
- Widget _getSelectedPage() {
-  switch (_selectedPage) {
-    case 'Manage Orders':
-      return SingleChildScrollView(child: ManageOrdersScreen());
-    case 'Products':
-      return SingleChildScrollView(child: ProductsScreen());
-    case 'User Profile':
-      return SingleChildScrollView(child: UserProfileScreen());
-    case 'Wishlist Product':
-      return SingleChildScrollView(child: WishlistProductScreen());
-    case 'Cart Products':
-      return SingleChildScrollView(child: CartProductsScreen());
-    case 'Ratings':
-      return SingleChildScrollView(child: RatingsScreen());
-    case 'Discounts & Banners':
-      return SingleChildScrollView(child: DiscountsAndBannersScreen());
-    case 'Gift Box':
-      return SingleChildScrollView(child: GiftBoxScreen());
-    case 'Settings':
-      return SingleChildScrollView(child: SettingsScreen());
-    case 'Dashboard':
-    default:
-      return SingleChildScrollView(child: DashboardScreen());
+  Widget _getSelectedPage() {
+    switch (_selectedPage) {
+      case 'Manage Orders':
+        return ManageOrdersScreen();
+      case 'Products':
+        return ProductsScreen();
+      case 'User Profile':
+        return UserProfileScreen();
+      case 'Wishlist Product':
+        return WishlistProductScreen();
+      case 'Cart Products':
+        return CartProductsScreen();
+      case 'Ratings':
+        return RatingsScreen();
+      case 'Discounts & Banners':
+        return DiscountsAndBannersScreen();
+      case 'Gift Box':
+        return GiftBoxScreen();
+      case 'Settings':
+        return SettingsScreen();
+      case 'Dashboard':
+      default:
+        return DashboardScreen();
+    }
   }
-}
-
 }
 
 // Main entry point of the app
