@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 import 'product_detail.dart'; // Import your ProductDetail page
 
 class ProductsScreen extends StatefulWidget {
