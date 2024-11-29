@@ -1,1229 +1,583 @@
+import 'dart:typed_data';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
+
+void main() {
+  runApp(MaterialApp(
+    home: ProductDetail(),
+  ));
+}
 
 class ProductDetail extends StatefulWidget {
-
   @override
   _ProductDetailState createState() => _ProductDetailState();
 }
 
 class _ProductDetailState extends State<ProductDetail> {
- Set <String> _selectedSizes = {}; // Variable to track selected size
+  List<String> categories = [];
+  String? selectedCategory;
+  Set<String> _selectedSizes = {};
+  List<TextEditingController> _fieldControllers = List.generate(17, (_) => TextEditingController());
+  List<String?> _errorMessages = List.generate(17, (_) => null);
+
+  String? categoryErrorMessage;
+  String? sizeErrorMessage;
+
+  List<Uint8List?> _productImages = List.generate(6, (_) => null);
+  List<Uint8List?> _accessoriesImages = List.generate(6, (_) => null);
+
+  List<String?> _imageUrls = List.generate(6, (_) => null);
+  List<String?> _accImageUrls = List.generate(6, (_) => null);
+
+  final ImagePicker _picker = ImagePicker();
+  bool _isStarred = false;
+  bool _isUploading = false;
+
+  final List<String> availableSizes = ['S', 'M', 'L', 'XL', 'XXL', 'Free Size'];
+
+  final TextEditingController _newCategoryController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final categoryCollection = FirebaseFirestore.instance.collection('Categories');
+      final snapshot = await categoryCollection.get();
+      final List<String> loadedCategories = snapshot.docs.map((doc) => doc.id).toList();
+
+      setState(() {
+        categories = loadedCategories;
+      });
+    } catch (e) {
+      print('Error loading categories: $e');
+    }
+  }
+
+  Future<void> _addCategory() async {
+    String newCategory = _newCategoryController.text.trim();
+    if (newCategory.isNotEmpty && !categories.contains(newCategory)) {
+      try {
+        final categoryRef = FirebaseFirestore.instance.collection('Categories').doc(newCategory);
+        await categoryRef.set({});
+        setState(() {
+          categories.add(newCategory);
+          _newCategoryController.clear();
+        });
+      } catch (e) {
+        print('Error adding category: $e');
+      }
+    }
+  }
+
+  Future<void> _deleteCategory(String category) async {
+    if (categories.length > 1 && categories.contains(category)) {
+      try {
+        final categoryRef = FirebaseFirestore.instance.collection('Categories').doc(category);
+        await categoryRef.delete();
+        setState(() {
+          categories.remove(category);
+          if (selectedCategory == category) {
+            selectedCategory = null;
+          }
+        });
+      } catch (e) {
+        print('Error deleting category: $e');
+      }
+    }
+  }
+
+  Future<void> _pickImage(int index, bool isProductImage) async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      Uint8List imageData = await image.readAsBytes();
+      setState(() {
+        if (isProductImage && index >= 1 && index <= 6) {
+          _productImages[index - 1] = imageData;
+        } else if (!isProductImage && index >= 1 && index <= 6) {
+          _accessoriesImages[index - 1] = imageData;
+        }
+      });
+    }
+  }
+
+  Future<String?> _uploadImageToFirebase(Uint8List imageData, String path) async {
+    try {
+      final ref = FirebaseStorage.instance.ref().child(path);
+      UploadTask uploadTask = ref.putData(imageData);
+      final snapshot = await uploadTask;
+      return await snapshot.ref.getDownloadURL();
+    } catch (e) {
+      print('Error uploading image: $e');
+      return null;
+    }
+  }
+
+  Future<void> _saveImages() async {
+    final uuid = Uuid(); // Create an instance of Uuid
+
+    for (int i = 0; i < _productImages.length; i++) {
+      if (_productImages[i] != null) {
+        final uniqueImageName = 'products/product_image_${uuid.v4()}.png';
+        _imageUrls[i] = await _uploadImageToFirebase(
+          _productImages[i]!,
+          uniqueImageName,
+        );
+      }
+    }
+
+    for (int i = 0; i < _accessoriesImages.length; i++) {
+      if (_accessoriesImages[i] != null) {
+        final uniqueImageName = 'accessories/accessories_image_${uuid.v4()}.png';
+        _accImageUrls[i] = await _uploadImageToFirebase(
+          _accessoriesImages[i]!,
+          uniqueImageName,
+        );
+      }
+    }
+  }
+
+  Future<void> _saveProductToFirestore() async {
+    bool hasError = false;
+
+    if (selectedCategory == null) {
+      setState(() {
+        categoryErrorMessage = 'Please select a category';
+      });
+      hasError = true;
+    } else {
+      setState(() {
+        categoryErrorMessage = null;
+      });
+    }
+
+    if (_selectedSizes.isEmpty) {
+      setState(() {
+        sizeErrorMessage = 'Please select at least one size';
+      });
+      hasError = true;
+    } else {
+      setState(() {
+        sizeErrorMessage = null;
+      });
+    }
+
+    for (int i = 0; i < _fieldControllers.length; i++) {
+      if (_fieldControllers[i].text.isEmpty) {
+        setState(() {
+          _errorMessages[i] = 'This field cannot be empty';
+        });
+        hasError = true;
+      } else {
+        setState(() {
+          _errorMessages[i] = null;
+        });
+      }
+    }
+
+    if (!hasError) {
+      setState(() {
+        _isUploading = true;
+      });
+
+      try {
+        await _saveImages();
+
+        Map<String, dynamic> productData = {
+          'category': selectedCategory,
+          'sizes': _selectedSizes.toList(),
+          'product_name': _fieldControllers[0].text,
+          'product_price': _fieldControllers[1].text,
+          'care_guide': _fieldControllers[15].text,
+          'material': _fieldControllers[16].text,
+          'product_description': _fieldControllers[14].text,
+          for (int i = 0; i < _imageUrls.length; i++)
+            'product_image_${i + 1}': _imageUrls[i],
+          for (int i = 0; i < _accImageUrls.length; i++)
+            'accessories_image_${i + 1}': _accImageUrls[i],
+          'accessories_names': List.generate(6, (index) => _fieldControllers[index * 2 + 2].text),
+          'accessories_prices': List.generate(6, (index) => _fieldControllers[index * 2 + 3].text),
+          'isStarred': _isStarred,
+        };
+
+        await FirebaseFirestore.instance.collection('Products').add(productData);
+
+        setState(() {
+          _fieldControllers.forEach((controller) => controller.clear());
+          selectedCategory = null;
+          _selectedSizes.clear();
+          _isStarred = false;
+          _productImages = List.generate(6, (_) => null);
+          _accessoriesImages = List.generate(6, (_) => null);
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Product saved successfully!')));
+      } catch (e) {
+        print('Error saving product: $e');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error saving product.')));
+      } finally {
+        setState(() {
+          _isUploading = false;
+        });
+      }
+    }
+  }
+
+
+  void _toggleSize(String size) {
+    setState(() {
+      if (_selectedSizes.contains(size)) {
+        _selectedSizes.remove(size);
+      } else {
+        _selectedSizes.add(size);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: Text('ProductDetail', style: TextStyle(color: Colors.black)),
-        elevation: 0,
+        title: Text('Product Details'),
+        backgroundColor: Colors.blueAccent,
+        actions: [
+          IconButton(
+            icon: Icon(
+              _isStarred ? Icons.star : Icons.star_border,
+              color: _isStarred ? Colors.yellow : Colors.white,
+            ),
+            onPressed: () {
+              setState(() {
+                _isStarred = !_isStarred;
+              });
+            },
+          ),
+          IconButton(
+            icon: Icon(Icons.save),
+            onPressed: _saveProductToFirestore,
+          ),
+        ],
       ),
-      body: Row(
-        children: [
-          Expanded(
-            child: Container(
-              color: Color(0xFFF1F1F1), // Left container color
-              padding: EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Product Images',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 16), // Space between text and grid
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Expanded(
-                          child: GridView(
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2, // 2 columns
-                              crossAxisSpacing: 16,
-                              mainAxisSpacing: 16,
-                            ),
-                            children: [
-                              GridItem1(),
-                              GridItem2(),
-                              GridItem3(),
-                              GridItem4(),
-                              GridItem5(),
-                              GridItem6(),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: 16), // Space between grid and text
-                        Text(
-                          'Accessroes Images',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        SizedBox(height: 16), // Space between text and next grid
-                        Expanded(
-                          child: GridView(
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2, // 2 columns
-                              crossAxisSpacing: 16,
-                              mainAxisSpacing: 16,
-                            ),
-                            children: [
-                              GridItem7(),
-                              GridItem8(),
-                              GridItem9(),
-                              GridItem10(),
-                              GridItem11(),
-                              GridItem12(),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSectionTitle('Product Images'),
+            SizedBox(height: 10),
+            ImageGrid(images: _productImages, onImageTap: (index) => _pickImage(index + 1, true)),
+
+            SizedBox(height: 20),
+
+            _buildSectionTitle('Product Details'),
+            SizedBox(height: 10),
+            ProductForm(
+              fieldControllers: _fieldControllers,
+              errorMessages: _errorMessages,
+              categoryErrorMessage: categoryErrorMessage,
+              sizeErrorMessage: sizeErrorMessage,
+              categories: categories,
+              selectedCategory: selectedCategory,
+              onCategoryChanged: (category) {
+                setState(() {
+                  selectedCategory = category;
+                });
+              },
+              onSave: _saveProductToFirestore,
+              toggleSize: _toggleSize,
+              selectedSizes: _selectedSizes,
+            ),
+
+            SizedBox(height: 20),
+
+            _buildSectionTitle('Accessories Images'),
+            SizedBox(height: 10),
+            ImageGrid(images: _accessoriesImages, onImageTap: (index) => _pickImage(index + 1, false)),
+
+            SizedBox(height: 20),
+
+            _buildSectionTitle('Accessories Details'),
+            SizedBox(height: 10),
+            AccessoriesForm(
+              fieldControllers: _fieldControllers,
+              errorMessages: _errorMessages,
+            ),
+
+            SizedBox(height: 20),
+
+            _buildSectionTitle('Manage Categories'),
+            SizedBox(height: 10),
+            TextField(
+              controller: _newCategoryController,
+              decoration: InputDecoration(
+                labelText: 'New Category',
+                border: OutlineInputBorder(),
               ),
             ),
-          ),
-
-
-
-
-
-          Expanded(
-            child: Column(
-              children: [
-                Expanded(
-                  flex: 9,
-                  child: Container(
-                    color: Colors.white,
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          Text('Product Details', style: GoogleFonts.josefinSans(
-                              fontSize: 25,
-                              fontWeight: FontWeight.bold
-                          )),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8.0),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(right: 8.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-
-                                        Text('Label 1', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                        SizedBox(height: 4),
-                                        Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(12),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.grey.withOpacity(0.5),
-                                                spreadRadius: 1,
-                                                blurRadius: 8,
-                                                offset: Offset(0, 4),
-                                              ),
-                                            ],
-                                          ),
-                                          child: TextField(
-                                            decoration: InputDecoration(
-                                              border: InputBorder.none,
-                                              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                              hintText: 'Field 1',
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(left: 8.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text('Label 2', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                        SizedBox(height: 4),
-                                        Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(12),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.grey.withOpacity(0.5),
-                                                spreadRadius: 1,
-                                                blurRadius: 8,
-                                                offset: Offset(0, 4),
-                                              ),
-                                            ],
-                                          ),
-                                          child: TextField(
-                                            decoration: InputDecoration(
-                                              border: InputBorder.none,
-                                              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                              hintText: 'Field 2',
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(height: 20,),
-                          Text('Accesories Price', style: GoogleFonts.josefinSans(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold)),
-                          SizedBox(height: 20,),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8.0),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(right: 8.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-
-                                        Text('Label 3', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-
-                                        SizedBox(height: 4),
-                                        Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(12),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.grey.withOpacity(0.5),
-                                                spreadRadius: 1,
-                                                blurRadius: 8,
-                                                offset: Offset(0, 4),
-                                              ),
-                                            ],
-                                          ),
-                                          child: TextField(
-                                            decoration: InputDecoration(
-                                              border: InputBorder.none,
-                                              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                              hintText: 'Field 3',
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(left: 8.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text('Label 4', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                        SizedBox(height: 4),
-                                        Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(12),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.grey.withOpacity(0.5),
-                                                spreadRadius: 1,
-                                                blurRadius: 8,
-                                                offset: Offset(0, 4),
-                                              ),
-                                            ],
-                                          ),
-                                          child: TextField(
-                                            decoration: InputDecoration(
-                                              border: InputBorder.none,
-                                              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                              hintText: 'Field 4',
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Row for TextFields 5 and 6
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8.0),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(right: 8.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text('Label 5', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                        SizedBox(height: 4),
-                                        Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(12),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.grey.withOpacity(0.5),
-                                                spreadRadius: 1,
-                                                blurRadius: 8,
-                                                offset: Offset(0, 4),
-                                              ),
-                                            ],
-                                          ),
-                                          child: TextField(
-                                            decoration: InputDecoration(
-                                              border: InputBorder.none,
-                                              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                              hintText: 'Field 5',
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(left: 8.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text('Label 6', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                        SizedBox(height: 4),
-                                        Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(12),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.grey.withOpacity(0.5),
-                                                spreadRadius: 1,
-                                                blurRadius: 8,
-                                                offset: Offset(0, 4),
-                                              ),
-                                            ],
-                                          ),
-                                          child: TextField(
-                                            decoration: InputDecoration(
-                                              border: InputBorder.none,
-                                              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                              hintText: 'Field 6',
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Row for TextFields 7 and 8
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8.0),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(right: 8.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text('Label 7', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                        SizedBox(height: 4),
-                                        Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(12),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.grey.withOpacity(0.5),
-                                                spreadRadius: 1,
-                                                blurRadius: 8,
-                                                offset: Offset(0, 4),
-                                              ),
-                                            ],
-                                          ),
-                                          child: TextField(
-                                            decoration: InputDecoration(
-                                              border: InputBorder.none,
-                                              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                              hintText: 'Field 7',
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(left: 8.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text('Label 8', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                        SizedBox(height: 4),
-                                        Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(12),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.grey.withOpacity(0.5),
-                                                spreadRadius: 1,
-                                                blurRadius: 8,
-                                                offset: Offset(0, 4),
-                                              ),
-                                            ],
-                                          ),
-                                          child: TextField(
-                                            decoration: InputDecoration(
-                                              border: InputBorder.none,
-                                              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                              hintText: 'Field 8',
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Row for TextFields 9 and 10
-                          SizedBox(height: 20,),
-                          Text('Description and guide', style: GoogleFonts.josefinSans(fontSize: 24, fontWeight: FontWeight.bold)),
-
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Label 9', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                SizedBox(height: 4),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.grey.withOpacity(0.5),
-                                        spreadRadius: 1,
-                                        blurRadius: 8,
-                                        offset: Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: TextField(
-                                    minLines: 1,
-                                    maxLines: null, // Makes the TextField grow as the user types
-                                    decoration: InputDecoration(
-                                      border: InputBorder.none,
-                                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                      hintText: 'Field 9',
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Label 10', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                SizedBox(height: 4),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.grey.withOpacity(0.5),
-                                        spreadRadius: 1,
-                                        blurRadius: 8,
-                                        offset: Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: TextField(
-                                    minLines: 1,
-                                    maxLines: null, // Makes the TextField grow as the user types
-                                    decoration: InputDecoration(
-                                      border: InputBorder.none,
-                                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                      hintText: 'Field 10',
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Label 11', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                SizedBox(height: 4),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.grey.withOpacity(0.5),
-                                        spreadRadius: 1,
-                                        blurRadius: 8,
-                                        offset: Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: TextField(
-                                    minLines: 1,
-                                    maxLines: null, // Makes the TextField grow as the user types
-                                    decoration: InputDecoration(
-                                      border: InputBorder.none,
-                                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                      hintText: 'Field 11',
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(height: 20), // Space between Field 11 and the size selector
-
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.start,
-                                  children: [
-                                    GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          if (_selectedSizes.contains("XS")) {
-                                            _selectedSizes.remove("XS");
-                                          } else {
-                                            _selectedSizes.add("XS");
-                                          }
-                                        });
-                                      },
-                                      child: Container(
-                                        height: 60,
-                                        width: 80,
-                                        padding: EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: _selectedSizes.contains("XS") ? Colors.red : Colors.white,
-                                          border: Border.all(
-                                            color: _selectedSizes.contains("XS") ? Colors.red : Colors.black,
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            "XS",
-                                            style: TextStyle(
-                                              fontSize: 15,
-                                              color: _selectedSizes.contains("XS") ? Colors.white : Colors.black,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(width: 10),
-                                    GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          if (_selectedSizes.contains("S")) {
-                                            _selectedSizes.remove("S");
-                                          } else {
-                                            _selectedSizes.add("S");
-                                          }
-                                        });
-                                      },
-                                      child: Container(
-                                        height: 60,
-                                        width: 90,
-                                        padding: EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: _selectedSizes.contains("S") ? Colors.red : Colors.white,
-                                          border: Border.all(
-                                            color: _selectedSizes.contains("S") ? Colors.red : Colors.black,
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            "S",
-                                            style: TextStyle(
-                                              fontSize: 15,
-                                              color: _selectedSizes.contains("S") ? Colors.white : Colors.black,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(width: 10),
-                                    GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          if (_selectedSizes.contains("M")) {
-                                            _selectedSizes.remove("M");
-                                          } else {
-                                            _selectedSizes.add("M");
-                                          }
-                                        });
-                                      },
-                                      child: Container(
-                                        height: 60,
-                                        width: 80,
-                                        padding: EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: _selectedSizes.contains("M") ? Colors.red : Colors.white,
-                                          border: Border.all(
-                                            color: _selectedSizes.contains("M") ? Colors.red : Colors.black,
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            "M",
-                                            style: TextStyle(
-                                              fontSize: 15,
-                                              color: _selectedSizes.contains("M") ? Colors.white : Colors.black,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(width: 10),
-                                    GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          if (_selectedSizes.contains("L")) {
-                                            _selectedSizes.remove("L");
-                                          } else {
-                                            _selectedSizes.add("L");
-                                          }
-                                        });
-                                      },
-                                      child: Container(
-                                        height: 60,
-                                        width: 80,
-                                        padding: EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: _selectedSizes.contains("L") ? Colors.red : Colors.white,
-                                          border: Border.all(
-                                            color: _selectedSizes.contains("L") ? Colors.red : Colors.black,
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            "L",
-                                            style: TextStyle(
-                                              fontSize: 15,
-                                              color: _selectedSizes.contains("L") ? Colors.white : Colors.black,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(width: 10),
-                                    GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          if (_selectedSizes.contains("XL")) {
-                                            _selectedSizes.remove("XL");
-                                          } else {
-                                            _selectedSizes.add("XL");
-                                          }
-                                        });
-                                      },
-                                      child: Container(
-                                        height: 60,
-                                        width: 90,
-                                        padding: EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: _selectedSizes.contains("XL") ? Colors.red : Colors.white,
-                                          border: Border.all(
-                                            color: _selectedSizes.contains("XL") ? Colors.red : Colors.black,
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            "XL",
-                                            style: TextStyle(
-                                              fontSize: 15,
-                                              color: _selectedSizes.contains("XL") ? Colors.white : Colors.black,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(width: 10),
-                                    GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          if (_selectedSizes.contains("XXL")) {
-                                            _selectedSizes.remove("XXL");
-                                          } else {
-                                            _selectedSizes.add("XXL");
-                                          }
-                                        });
-                                      },
-                                      child: Container(
-                                        height: 60,
-                                        width: 100,
-                                        padding: EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: _selectedSizes.contains("XXL") ? Colors.red : Colors.white,
-                                          border: Border.all(
-                                            color: _selectedSizes.contains("XXL") ? Colors.red : Colors.black,
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            "XXL",
-                                            style: TextStyle(
-                                              fontSize: 15,
-                                              color: _selectedSizes.contains("XXL") ? Colors.white : Colors.black,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(width: 10),
-                                    GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          if (_selectedSizes.contains("Free Size")) {
-                                            _selectedSizes.remove("Free Size");
-                                          } else {
-                                            _selectedSizes.add("Free Size");
-                                          }
-                                        });
-                                      },
-                                      child: Container(
-                                        height: 60,
-                                        width: 100,
-                                        padding: EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: _selectedSizes.contains("Free Size") ? Colors.red : Colors.white,
-                                          border: Border.all(
-                                            color: _selectedSizes.contains("Free Size") ? Colors.red : Colors.black,
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            "Free Size",
-                                            style: TextStyle(
-                                              fontSize: 15,
-                                              color: _selectedSizes.contains("Free Size") ? Colors.white : Colors.black,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                )
-
-                              ],
-                            ),
-                          )
-
-
-
-
-
-
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                Container(
-                  color: Colors.white,
-                  padding: EdgeInsets.all(16),
-                  child: Align(
-                    alignment: Alignment.center,
-                    child: SizedBox(
-                      width: 200,  // Set desired width
-                      height: 50,  // Set desired height
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12), // Match with button corners for consistency
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.5), // Shadow color
-                              spreadRadius: 1, // Spread radius
-                              blurRadius: 8, // Blur radius
-                              offset: Offset(0, 4), // Shadow offset
-                            ),
-                          ],
-                        ),
-                        child: ElevatedButton(
-                          onPressed: () {
-                            // Add your onPressed code here!
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            elevation: 0, // Set to 0 to avoid double shadow
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(3),  // Set corner radius
-                            ),
-                          ),
-                          child: Text(
-                            'Done',
-                            style: GoogleFonts.josefinSans(
-                              fontSize: 20,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+            SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: _addCategory,
+              child: Text('Add Category'),
             ),
-          )
+            SizedBox(height: 10),
+            Wrap(
+              spacing: 8.0,
+              children: categories.map((category) {
+                return Chip(
+                  label: Text(category),
+                  deleteIcon: Icon(Icons.close),
+                  onDeleted: () => _deleteCategory(category),
+                );
+              }).toList(),
+            ),
 
+            SizedBox(height: 20),
 
+            Center(
+              child: _isUploading
+                  ? CircularProgressIndicator()
+                  : Container(
+                decoration: BoxDecoration(
+                  color: Colors.blueAccent,
+                  borderRadius: BorderRadius.zero,
+                ),
+                child: TextButton(
+                  onPressed: _saveProductToFirestore,
+                  child: Text(
+                    'Save Product',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: 80, vertical: 20),
+                    backgroundColor: Colors.blueAccent,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-
-
-
-
-        ],
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
       ),
     );
   }
 }
 
-// Define separate widgets for each grid item
-class GridItem1 extends StatelessWidget {
+class ProductForm extends StatelessWidget {
+  final List<TextEditingController> fieldControllers;
+  final List<String?> errorMessages;
+  final String? categoryErrorMessage;
+  final String? sizeErrorMessage;
+  final List<String> categories;
+  final String? selectedCategory;
+  final void Function(String?) onCategoryChanged;
+  final VoidCallback onSave;
+  final void Function(String) toggleSize;
+  final Set<String> selectedSizes;
+
+  ProductForm({
+    required this.fieldControllers,
+    required this.errorMessages,
+    required this.categoryErrorMessage,
+    required this.sizeErrorMessage,
+    required this.categories,
+    required this.selectedCategory,
+    required this.onCategoryChanged,
+    required this.onSave,
+    required this.toggleSize,
+    required this.selectedSizes,
+  });
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.5),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: Offset(0, 3), // changes position of shadow
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DropdownButtonFormField<String>(
+          hint: Text('Select Category'),
+          value: selectedCategory,
+          onChanged: onCategoryChanged,
+          items: categories.map((category) {
+            return DropdownMenuItem<String>(
+              value: category,
+              child: Text(category),
+            );
+          }).toList(),
+          decoration: InputDecoration(
+            border: OutlineInputBorder(),
+            errorText: categoryErrorMessage,
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.image,
-            color: Colors.red[600],
-            size: 40,
+        ),
+        SizedBox(height: 10),
+        TextFormField(
+          controller: fieldControllers[0],
+          decoration: InputDecoration(
+            labelText: 'Product Name',
+            border: OutlineInputBorder(),
+            errorText: errorMessages[0],
           ),
-          SizedBox(height: 8),
-          Text(
-            'Item 1',
-            style: TextStyle(color: Colors.red[600]),
+        ),
+        SizedBox(height: 10),
+        TextFormField(
+          controller: fieldControllers[1],
+          decoration: InputDecoration(
+            labelText: 'Product Price (INR)',
+            border: OutlineInputBorder(),
+            errorText: errorMessages[1],
           ),
-        ],
-      ),
+          keyboardType: TextInputType.number,
+        ),
+        SizedBox(height: 10),
+        TextFormField(
+          controller: fieldControllers[14],
+          decoration: InputDecoration(
+            labelText: 'Product Description',
+            border: OutlineInputBorder(),
+            errorText: errorMessages[14],
+          ),
+        ),
+        SizedBox(height: 10),
+        TextFormField(
+          controller: fieldControllers[15],
+          decoration: InputDecoration(
+            labelText: 'Care Guide',
+            border: OutlineInputBorder(),
+            errorText: errorMessages[15],
+          ),
+        ),
+        SizedBox(height: 10),
+        TextFormField(
+          controller: fieldControllers[16],
+          decoration: InputDecoration(
+            labelText: 'Material',
+            border: OutlineInputBorder(),
+            errorText: errorMessages[16],
+          ),
+        ),
+        SizedBox(height: 20),
+        Wrap(
+          spacing: 8.0,
+          children: ['S', 'M', 'L', 'XL', 'XXL', 'Free Size'].map((size) {
+            return FilterChip(
+              label: Text(size),
+              selected: selectedSizes.contains(size),
+              onSelected: (selected) => toggleSize(size),
+            );
+          }).toList(),
+        ),
+        if (sizeErrorMessage != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Text(sizeErrorMessage!, style: TextStyle(color: Colors.red)),
+          ),
+        SizedBox(height: 20),
+      ],
     );
   }
 }
 
-class GridItem2 extends StatelessWidget {
+class AccessoriesForm extends StatelessWidget {
+  final List<TextEditingController> fieldControllers;
+  final List<String?> errorMessages;
+
+  AccessoriesForm({
+    required this.fieldControllers,
+    required this.errorMessages,
+  });
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.5),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: Offset(0, 3),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: List.generate(6, (index) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 20.0),
+          child: Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: TextFormField(
+                  controller: fieldControllers[index * 2 + 2],
+                  decoration: InputDecoration(
+                    labelText: 'Accessory ${index + 1} Name',
+                    border: OutlineInputBorder(),
+                    errorText: errorMessages[index * 2 + 2],
+                  ),
+                ),
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                flex: 1,
+                child: TextFormField(
+                  controller: fieldControllers[index * 2 + 3],
+                  decoration: InputDecoration(
+                    labelText: 'Price (INR)',
+                    border: OutlineInputBorder(),
+                    errorText: errorMessages[index * 2 + 3],
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: <TextInputFormatter>[
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.image,
-            color: Colors.pink[600],
-            size: 40,
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Item 2',
-            style: TextStyle(color: Colors.pink[600]),
-          ),
-        ],
-      ),
+        );
+      }),
     );
   }
 }
 
-class GridItem3 extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.5),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.image,
-            color: Colors.green[600],
-            size: 40,
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Item 3',
-            style: TextStyle(color: Colors.green[600]),
-          ),
-        ],
-      ),
-    );
-  }
-}
+class ImageGrid extends StatelessWidget {
+  final List<Uint8List?> images;
+  final void Function(int) onImageTap;
 
-class GridItem4 extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.5),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.image,
-            color: Colors.orange[600],
-            size: 40,
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Item 4',
-            style: TextStyle(color: Colors.orange[600]),
-          ),
-        ],
-      ),
-    );
-  }
-}
+  ImageGrid({
+    required this.images,
+    required this.onImageTap,
+  });
 
-class GridItem5 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.5),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: Offset(0, 3),
-          ),
-        ],
+    return GridView.builder(
+      shrinkWrap: true,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 8.0,
+        mainAxisSpacing: 8.0,
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.image,
-            color: Colors.purple[600],
-            size: 40,
+      itemCount: images.length,
+      itemBuilder: (context, index) {
+        return GestureDetector(
+          onTap: () => onImageTap(index),
+          child: Container(
+            color: Colors.grey[200],
+            child: images[index] != null
+                ? Image.memory(images[index]!, fit: BoxFit.cover)
+                : Icon(Icons.add_a_photo, color: Colors.grey),
           ),
-          SizedBox(height: 8),
-          Text(
-            'Item 5',
-            style: TextStyle(color: Colors.purple[600]),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class GridItem6 extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.5),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.image,
-            color: Colors.yellow[600],
-            size: 40,
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Item 6',
-            style: TextStyle(color: Colors.yellow[600]),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class GridItem7 extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.5),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.image,
-            color: Colors.cyan[600],
-            size: 40,
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Item 7',
-            style: TextStyle(color: Colors.cyan[600]),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class GridItem8 extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.5),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.image,
-            color: Colors.teal[600],
-            size: 40,
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Item 8',
-            style: TextStyle(color: Colors.teal[600]),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class GridItem9 extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.5),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.image,
-            color: Colors.indigo[600],
-            size: 40,
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Item 9',
-            style: TextStyle(color: Colors.indigo[600]),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class GridItem10 extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.5),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.image,
-            color: Colors.brown[600],
-            size: 40,
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Item 10',
-            style: TextStyle(color: Colors.brown[600]),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class GridItem11 extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.5),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.image,
-            color: Colors.grey[600],
-            size: 40,
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Item 11',
-            style: TextStyle(color: Colors.grey[600]),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class GridItem12 extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.5),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.image,
-            color: Colors.deepOrange[600],
-            size: 40,
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Item 12',
-            style: TextStyle(color: Colors.deepOrange[600]),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

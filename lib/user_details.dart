@@ -37,10 +37,6 @@ class UserDetailScreen extends StatelessWidget {
                       _buildUserInfoCard('Phone Number', userData['Phone Number'] ?? 'N/A'),
                       _buildUserInfoCard('Phone Number 1',
                           userData['Phone Number 1'] ?? 'Not Available'),
-                      _buildUserInfoCard('Phone Number 2',
-                          userData['Phone Number 2'] ?? 'Not Available'),
-                      _buildUserInfoCard('Phone Number 3',
-                          userData['Phone Number 3'] ?? 'Not Available'),
                       _buildUserInfoCard(
                           'Optional Phone Number',
                           (userData['Optional Phone Number'] != null &&
@@ -50,10 +46,6 @@ class UserDetailScreen extends StatelessWidget {
                       _buildUserInfoCard('Email Address', userData['Email Address'] ?? 'N/A'),
                       _buildUserInfoCard('Email Address 1',
                           userData['Email Address 1'] ?? 'Not Available'),
-                      _buildUserInfoCard('Email Address 2',
-                          userData['Email Address 2'] ?? 'Not Available'),
-                      _buildUserInfoCard('Email Address 3',
-                          userData['Email Address 3'] ?? 'Not Available'),
                       _buildUserInfoCard(
                           'Joining Date',
                           userData['Timing of giving order'] != null

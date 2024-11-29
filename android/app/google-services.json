@@ -1,14 +1,14 @@
 {
   "project_info": {
-    "project_number": "996608668596",
-    "firebase_url": "https://figure-fit-official-default-rtdb.asia-southeast1.firebasedatabase.app",
-    "project_id": "figure-fit-official",
-    "storage_bucket": "figure-fit-official.appspot.com"
+    "project_number": "749708945798",
+    "firebase_url": "https://figure-fit-fashion-b545f-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "figure-fit-fashion-b545f",
+    "storage_bucket": "figure-fit-fashion-b545f.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:996608668596:android:9aa06b7219f748c0f4f8e1",
+        "mobilesdk_app_id": "1:749708945798:android:252f05906a1cf91509a407",
         "android_client_info": {
           "package_name": "com.fashion.figure_fit_adminpanel"
         }
@@ -16,7 +16,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyC-CxLx9T8B_1xwg7vQiaIjHy_I8DvBD20"
+          "current_key": "AIzaSyDNXlxZ1FIk2j4WHXVIi-HJGHChXdrMkTo"
         }
       ],
       "services": {
@@ -27,7 +27,7 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:996608668596:android:41abc1b9d047b3f0f4f8e1",
+        "mobilesdk_app_id": "1:749708945798:android:7630d90173d4b69609a407",
         "android_client_info": {
           "package_name": "com.fashion.figure_fit_official"
         }
@@ -35,7 +35,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyC-CxLx9T8B_1xwg7vQiaIjHy_I8DvBD20"
+          "current_key": "AIzaSyDNXlxZ1FIk2j4WHXVIi-HJGHChXdrMkTo"
         }
       ],
       "services": {

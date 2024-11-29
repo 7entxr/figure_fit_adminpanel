@@ -5,18 +5,15 @@ import 'package:firebase_core/firebase_core.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
+    // Replace with actual values
     options: const FirebaseOptions(
-        apiKey: "AIzaSyABZsJFHkzXN0OoCNERRogRC0JNdWPuGxE",
-        authDomain: "figure-fit-official.firebaseapp.com",
-        databaseURL: "https://figure-fit-official-default-rtdb.asia-southeast1.firebasedatabase.app",
-        projectId: "figure-fit-official",
-        storageBucket: "figure-fit-official.appspot.com",
-        messagingSenderId: "996608668596",
-        appId: "1:996608668596:web:0d5ea9c718ecc31cf4f8e1",
-        measurementId: "G-DKVE5WCQ4V"
+      apiKey: "AIzaSyDNXlxZ1FIk2j4WHXVIi-HJGHChXdrMkTo",
+      appId: "1:749708945798:android:b7d0fca94d69719e09a407",
+      messagingSenderId: "749708945798",
+      storageBucket: "figure-fit-fashion-b545f.appspot.com",
+      projectId: "figure-fit-fashion-b545f",
     ),
   );
-
   runApp(MyApp());
 }
 
@@ -30,7 +27,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
       ),
-      home: const LoginPage(), // Navigate to the SignInPage
+      home:  LoginPage(), // Use const for stateless widgets
       debugShowCheckedModeBanner: false, // Remove the debug banner
     );
   }

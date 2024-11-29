@@ -1,30 +1,30 @@
+// This is a basic Flutter widget test.
+//
+// To perform an interaction with a widget in your test, use the WidgetTester
+// utility in the flutter_test package. For example, you can send tap and scroll
+// gestures. You can also use WidgetTester to find child widgets in the widget
+// tree, read text, and verify that the values of widget properties are correct.
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:figure_fit_adminpanel/login_page.dart'; // Ensure this path is correct
+
+import 'package:figure_fit_adminpanel/main.dart';
 
 void main() {
-  testWidgets('Basic functionality test for LoginPage', (WidgetTester tester) async {
-    // Build the LoginPage widget and trigger a frame.
-    await tester.pumpWidget(MaterialApp(home: LoginPage()));
+  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+    // Build our app and trigger a frame.
+    await tester.pumpWidget(const MyApp());
 
-    // Verify that the LoginPage is displayed.
-    expect(find.byType(LoginPage), findsOneWidget);
+    // Verify that our counter starts at 0.
+    expect(find.text('0'), findsOneWidget);
+    expect(find.text('1'), findsNothing);
 
-    // Verify that the side navigation contains the 'Dashboard' item.
-    expect(find.text('Dashboard'), findsOneWidget);
+    // Tap the '+' icon and trigger a frame.
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pump();
 
-    // Tap the menu icon to toggle the drawer width.
-    await tester.tap(find.byIcon(Icons.menu));
-    await tester.pump(); // Trigger the animation.
-
-    // Verify that the drawer width is minimized (optional, if you have specific checks).
-    // In this example, we are not checking specific drawer width states.
-
-    // Tap the menu icon again to expand the drawer.
-    await tester.tap(find.byIcon(Icons.menu));
-    await tester.pump(); // Trigger the animation.
-
-    // Verify that the drawer width is expanded and contains the 'Dashboard' item.
-    expect(find.text('Dashboard'), findsOneWidget);
+    // Verify that our counter has incremented.
+    expect(find.text('0'), findsNothing);
+    expect(find.text('1'), findsOneWidget);
   });
 }
